@@ -1,0 +1,56 @@
+{
+  "name": "plyn",
+  "displayName": "plyn",
+  "description": "",
+  "version": "0.0.1",
+  "publisher": "Codeplain",
+  "engines": {
+    "vscode": "^1.99.3"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "icon": "icons/plain.png",
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:plain"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Codeplain-ai/plain.git"
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "plain",
+        "aliases": [
+          "***plain",
+          "plain"
+        ],
+        "extensions": [
+          ".plain"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "plain",
+        "scopeName": "source.plain",
+        "path": "./syntaxes/plain.tmLanguage.json"
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "plain-icons",
+        "label": "Plain Icons",
+        "path": "./dist/material-icons.json"
+      }
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.99.0",
+    "typescript": "^5.9.3"
+  }
+}
