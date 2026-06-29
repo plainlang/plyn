@@ -1,0 +1,17 @@
+[package]
+name = "plyn-zed-extension"
+version = "0.0.1"
+edition = "2021"
+publish = false
+
+[lib]
+# A Zed extension's procedural part is compiled to WebAssembly. `cdylib` is
+# required for the wasm32-wasip1/wasip2 target to emit a dynamic library
+# Zed can load. `rlib` makes the crate usable from Rust tests if we add
+# them later.
+crate-type = ["cdylib"]
+
+[dependencies]
+# The Zed extension API. Pin to a stable line. If you target a newer Zed,
+# bump this version; see https://github.com/zed-industries/zed/blob/main/crates/extension_api#compatible-zed-versions
+zed_extension_api = "0.6.0"

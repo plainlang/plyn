@@ -1,0 +1,4 @@
+name = "***plain"
+grammar = "plain"
+path_suffixes = ["plain"]
+line_comments = ["> "]

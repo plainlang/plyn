@@ -1,0 +1,44 @@
+---
+description: An example plain spec for testing the grammar.
+required_concepts:
+  - user_profile
+  - account
+exported_concepts:
+  - dashboard
+import:
+  - utils/common.plain
+requires:
+  - python:3.11
+---
+
+> This is a line comment that should be highlighted as such.
+> Another comment line.
+
+***definitions***
+
+A :user_profile: is a record describing a person. It contains a name and an
+email address. The "{{ user.name }}" template is rendered when the page loads.
+
+See the [user guide](https://example.com/docs) for more details.
+
+Strings render in four styles: a <tag>, a 'single', a "double", and a `code` span.
+
+{% include templates/header.plain %}
+
+***implementation reqs***
+
+- Build the :account: page using the :user_profile: concept.
+- Provide a logout button.
+
+***test reqs***
+
+- Verify :user_profile: renders correctly.
+
+***functional specs***
+
+When the user clicks the button, the system displays "{{ greeting }}" and
+navigates to :dashboard:.
+
+***acceptance tests***
+
+- Given a logged in user, when they open the app, then :dashboard: appears.

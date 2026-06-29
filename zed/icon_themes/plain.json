@@ -1,0 +1,17 @@
+{
+  "$schema": "https://zed.dev/schema/icon_themes/v0.3.0.json",
+  "name": "Plyn",
+  "author": "Codeplain",
+  "themes": [
+    {
+      "name": "Plyn",
+      "appearance": "dark",
+      "file_suffixes": {
+        "plain": "plain"
+      },
+      "file_icons": {
+        "plain": { "path": "./icons/plain.svg" }
+      }
+    }
+  ]
+}

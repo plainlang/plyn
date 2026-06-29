@@ -1,0 +1,28 @@
+id = "plyn"
+name = "Plyn"
+version = "0.0.1"
+schema_version = 1
+authors = ["Codeplain"]
+description = "Language support for the ***plain spec-driven language"
+repository = "https://github.com/plainlang/plyn"
+
+# Icon theme that maps `.plain` files to the ***plain logo in the project
+# panel. Zed merges this over its default icon theme, so every other file
+# type keeps its normal icon — only `.plain` is overridden. The theme's
+# display name comes from the JSON file, not from here.
+icon_themes = ["icon_themes/plain.json"]
+
+# Tree-sitter grammar for the ***plain language. `repository` must be a public
+# Git URL and `rev` a full commit SHA on its default branch — Zed clones and
+# builds the grammar at install time. The grammar keeps its own repository;
+# Zed cannot load a grammar from a monorepo subdirectory.
+[grammars.plain]
+repository = "https://github.com/plainlang/tree-sitter-plain"
+rev = "5455aa29fdb0429266549250d7b2f77b95affc50"
+
+# The language server is the `plain-language-server` npm package. The Rust shim
+# in `src/lib.rs` installs it with Zed's bundled Node and launches it, so users
+# don't have to install anything by hand.
+[language_servers.plain-language-server]
+name = "Plain Language Server"
+languages = ["***plain"]
