@@ -70,7 +70,7 @@ export class PlainDefinitionProvider implements vscode.DefinitionProvider {
         if (this.preprocessingService) {
             let conceptDefinitions = null;
             if (this.isAConceptDefinition(document, position, word)) {
-                conceptDefinitions = this.preprocessingService.findConceptUsage(word);
+                conceptDefinitions = this.preprocessingService.findConceptUsageExcludingDefinition(word);
             } else {
                 conceptDefinitions = this.preprocessingService.findConceptDefinition(word);
             }

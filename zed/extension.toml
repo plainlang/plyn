@@ -12,7 +12,7 @@ repository = "https://github.com/plainlang/plyn"
 # Zed cannot load a grammar from a monorepo subdirectory.
 [grammars.plain]
 repository = "https://github.com/plainlang/tree-sitter-plain"
-rev = "5455aa29fdb0429266549250d7b2f77b95affc50"
+rev = "d8cdf342a207a9c2cad7941b503c6a1b058fb6b5"
 
 # The language server is the `plain-language-server` npm package. The Rust shim
 # in `src/lib.rs` installs it with Zed's bundled Node and launches it, so users

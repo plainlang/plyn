@@ -2,11 +2,8 @@
     "comments": {
         // symbol used for single line comment. Remove this entry if your language does not support line comments
         "lineComment": ">"
-    },
-    "folding": {
-        "markers": {
-            "start": "^\\*\\*\\*.*\\*\\*\\*$",
-            "end": "^(?=\\*\\*\\*.*\\*\\*\\*$)"
-        }
     }
+    // Section folding is provided by PlainFoldingRangeProvider (src/folding_provider.ts),
+    // which folds each ***section*** through to the next header / EOF (marker-based
+    // folding could not fold the final section).
 }

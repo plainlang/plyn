@@ -1,0 +1,22 @@
+# Zed extension — packaged separately (its own repo/flow); ~870MB, not part of
+# the VS Code / Cursor extension.
+zed/**
+
+# TypeScript sources & build tooling — only the compiled out/ ships.
+src/**
+scripts/**
+tsconfig.json
+**/*.ts
+**/*.map
+
+# Editor / repo metadata
+.vscode/**
+.git/**
+.gitignore
+.vscodeignore
+
+# Sample / dummy spec files used during development
+*.plain
+
+# Packaged artifacts
+*.vsix

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ConceptDefinition, PreprocessingService } from './preprocessor';
+import { BUILTIN_CONCEPTS } from './builtins';
 
 export class PlainHoverProvider implements vscode.HoverProvider {
     constructor(
@@ -39,6 +40,14 @@ export class PlainHoverProvider implements vscode.HoverProvider {
         
         const word = document.getText(wordRange);
 
+        // Built-in language concepts get a fixed description box.
+        const builtinDescription = BUILTIN_CONCEPTS.get(word);
+        if (builtinDescription) {
+            const md = new vscode.MarkdownString();
+            md.appendMarkdown(`**\`:${word}:\`** — built-in concept\n\n${builtinDescription}`);
+            return new vscode.Hover(md, wordRange);
+        }
+
         // Only show hover if preprocessing service is available
         if (!this.preprocessingService) {
             return undefined;
@@ -47,7 +56,7 @@ export class PlainHoverProvider implements vscode.HoverProvider {
         let concepts = null;        
         let definition = false;
         if (this.isAConceptDefinition(document, position, word)) {
-            concepts = this.preprocessingService.findConceptUsage(word);            
+            concepts = this.preprocessingService.findConceptUsageExcludingDefinition(word);
             definition = true;
         } else {
             concepts = this.preprocessingService.findConceptDefinition(word);            
