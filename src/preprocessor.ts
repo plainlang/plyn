@@ -5,12 +5,22 @@ import * as fs from 'fs';
 // ===== INTERFACES =====
 
 export interface ConceptDefinition {
-    concept: string;           // The concept name (e.g., "user_profile") 
+    concept: string;           // The concept name (e.g., "user_profile")
     filePath: string;          // Full path to the .plain file
     line: number;              // Line number where concept is defined
     character: number;         // Character position on the line
     content?: string;          // Optional: the full definition content
     section?: string;          // Optional: the section where the concept is defined
+    // For a definition, the last line/character of its block (declaration line
+    // plus indented continuation lines) — used to grey the whole unused block.
+    endLine?: number;
+    endCharacter?: number;
+    // For a *usage*, every position at which this concept token appears within
+    // the logical statement (the non-indented line plus its indented children).
+    // The index keeps one entry per concept per statement (so hover / navigation
+    // / rename see a statement once), but the undefined diagnostic flags every
+    // occurrence. Includes the primary (line, character).
+    occurrences?: { line: number; character: number }[];
 }
 
 export interface ConceptIndex {
@@ -174,25 +184,33 @@ export class ConceptExtractor {
                 return;
             }
             const blockText = block.map(entry => entry.text).join('\n');
-            const pushedConcepts: string[] = [];
+            // One index entry per concept per statement (first occurrence wins),
+            // but every position is recorded on `occurrences` so the undefined
+            // diagnostic can flag each one.
+            const byConcept = new Map<string, ConceptDefinition>();
             for (const { lineIndex, text } of block) {
                 conceptRegex.lastIndex = 0;
                 let match: RegExpExecArray | null;
                 while ((match = conceptRegex.exec(text)) !== null) {
                     const conceptName = match[0].slice(1, -1); // Remove first and last colon
-                    if (pushedConcepts.includes(conceptName)) {
+                    const existing = byConcept.get(conceptName);
+                    if (existing) {
+                        existing.occurrences!.push({ line: lineIndex, character: match.index });
                         continue;
                     }
-                    pushedConcepts.push(conceptName);
-                    concepts.push({
+                    byConcept.set(conceptName, {
                         concept: conceptName,
                         filePath: filePath,
                         line: lineIndex,
                         character: match.index,
                         content: blockText,
-                        section: blockSection
+                        section: blockSection,
+                        occurrences: [{ line: lineIndex, character: match.index }]
                     });
                 }
+            }
+            for (const concept of byConcept.values()) {
+                concepts.push(concept);
             }
             block = [];
         };
@@ -258,31 +276,54 @@ export class ConceptExtractor {
                 continue;
             }
                         
+            // Nested sub-items (indented by more than one space) are free-form
+            // detail lines that further clarify the preceding declaration — not
+            // new concept declarations. Skip them so a concept isn't recorded as
+            // defined twice.
+            const firstNonWs = line.search(/\S/);
+            if (firstNonWs > 1) {
+                continue;
+            }
+
             // Look for concept definitions: - :concept1:, :concept2:, :concept3:
-            const definitionMatch = trimmedLine.match(/^-\s(:[^\:]+:)(?:,\s*:[^\:]+:)*/);            
+            const definitionMatch = trimmedLine.match(/^-\s(:[^\:]+:)(?:,\s*:[^\:]+:)*/);
             if (definitionMatch) {
                 // Extract all concepts from this line using the same pattern as Python
                 const fullMatch = definitionMatch[0];
-                const conceptCandidates = fullMatch.match(/:([^\:]+):/g) || [];                                
-                
+                const conceptCandidates = fullMatch.match(/:([^\:]+):/g) || [];
+
                 // Validate each concept (letters, numbers, hyphens, dots, underscores)
                 const validConceptRegex = /^:[+\-\.0-9A-Z_a-z]+:$/;
-                
+
+                // The definition block spans the declaration line plus every
+                // indented, non-blank continuation line beneath it.
+                let endLine = lineIndex;
+                for (let j = lineIndex + 1; j < lines.length; j++) {
+                    if (/^\s+\S/.test(lines[j])) {
+                        endLine = j;
+                    } else {
+                        break;
+                    }
+                }
+                const endCharacter = lines[endLine].length;
+
                 for (const candidate of conceptCandidates) {
                     if (validConceptRegex.test(candidate)) {
                         // Remove the colons to get the concept name
                         const conceptName = candidate.slice(1, -1); // Remove first and last colon
                         const conceptCharPos = line.indexOf(candidate);
-                        
+
                         concepts.push({
                             concept: conceptName,
                             filePath: filePath,
                             line: lineIndex,
                             character: conceptCharPos,
                             content: line,
-                            section: currentSection
-                        });                       
-                    } 
+                            section: currentSection,
+                            endLine,
+                            endCharacter
+                        });
+                    }
                 }
             }
         }

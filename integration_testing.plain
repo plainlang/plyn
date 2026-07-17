@@ -1,0 +1,47 @@
+---
+description: "Shared conformance-testing requirements for every CRM integration plug-in. Carries the live-API testing policy and the credential-handling contract that all integration modules import. Holds no functional specs."
+---
+
+***definitions***
+
+- :IntegrationCredentials: are the secret values an integration uses to authenticate against its provider's live API.
+  - They are read from environment variables at runtime and are never committed to the repository.
+  - A concrete :IntegrationCredentials: names the exact environment variable keys it reads.
+  - The integration reads these same variable names at runtime that its :ConformanceTests: rely on.
+
+***test reqs***
+
+- :ConformanceTests: are implemented with pytest and run through the project's conformance test runner.
+  - :ConformanceTests: are executed with the `pytest` command.
+  - Each integration's :ConformanceTests: live in their own folder under `conformance_tests/`, named after the integration.
+
+- :ConformanceTests: are executed via the run script [test_scripts/run_conformance_tests_python.sh](test_scripts/run_conformance_tests_python.sh) - this is the exact contract the renderer's generated tests must satisfy.
+  - The script overlays the generated integration into the host source tree and stages the conformance suite into `.tmp/python_conformance/`, leaving the authored test tree pristine.
+  - It installs the conformance suite's dependencies, then runs `pytest` with `PYTHONPATH` set to the host root so the host implementation code is what gets imported.
+
+- :ConformanceTests: of a functionality that performs live provider I/O run against the live provider API - those provider calls are never mocked.
+  - This covers the integration's `fetch(get_stored)` entry point and the runtime wiring that invokes it.
+  - Such a run that never reached the provider proves nothing and must be treated as a failure.
+  - These :ConformanceTests: exercise `fetch(get_stored)` end to end against the live API and assert the returned records conform to the `data` shape the integration emits for its data_type (the contact shape for contact integrations).
+
+- :ConformanceTests: of a pure-function functionality - one that maps or transforms a given input into an output with no network access - run offline against fixed dummy inputs.
+  - They invoke that functionality directly with the dummy inputs and assert its exact expected outputs.
+  - They must NOT call the live provider API and must NOT call `fetch(get_stored)`; only the live-I/O functionalities above do that.
+
+- :ConformanceTests: that exercise the host's runtime discovery and ingestion of an integration import the host entry points (`discover_integrations`, `run_integration_service`) from the host module `src.services.ingest`.
+
+- :ConformanceTests: that perform live provider I/O must use the integration's :IntegrationCredentials: to authenticate against the live provider API.
+  - The same :IntegrationCredentials: the integration reads at runtime drive the live conformance run.
+
+- :ConformanceTests: read provider credentials from the environment, never from a value committed to the repo.
+  - The runner requires a `.env` file at the project root and fails fast with exit code 69 when it is absent.
+  - Variables exported in the shell are authoritative; the `.env` file only fills variables the shell did not already set.
+  - The runner is integration-agnostic: it loads the `.env` into the environment but never checks for any specific secret by name.
+  - Per-credential validation is each integration's job at runtime: its `fetch(get_stored)` raises an error naming any missing or empty variable. A live run with a complete environment simply succeeds, so the suite must not author a test that expects a missing-credential failure while the environment is configured.
+  - The credential variable names the suite reads are the same names the integration reads at runtime.
+
+- :ConformanceTests: pass only when at least one test ran with zero failures, zero errors, and zero skipped.
+  - A run that collected zero tests is a failure, not a pass.
+
+- A provider's rate-limit (HTTP 429) path must not exhaust the live API quota during :ConformanceTests:.
+  - :ConformanceTests: use a local mock for that one endpoint only; every other path stays live.

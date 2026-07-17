@@ -1,0 +1,121 @@
+---
+description: Shared concepts and tech-stack implementation reqs for the CRM host (a generic record store) and any integration module that builds on it. Carries no functional specs.
+---
+
+***definitions***
+
+- :Provider: is an external CRM system that records can be pulled from.
+  - Each :Provider: has a stable string identifier (e.g. "salesforce", "pipedrive").
+  - The identifier is opaque to the host backend - concrete providers are added by integration modules.
+
+- :Record: is one row in the host's generic store.
+  - The store is deliberately untyped - it holds records of any kind, distinguished only by their data_type.
+  - id - opaque server-generated identifier, stable for the lifetime of the row (required, set by the host backend)
+  - data_type - a string naming the kind of record this row holds, e.g. "contact" (required)
+  - source - the :Provider: identifier of the integration that produced the row (required)
+  - data - the record payload as a free-form JSON object; the host stores it verbatim and never validates its shape (required)
+  - created_at - timestamp of first creation (required, set by the host backend)
+  - updated_at - timestamp of last modification (required, set by the host backend)
+
+- :Contact: is the conventional shape of the `data` payload for a :Record: whose data_type is "contact".
+  - It is a plain JSON object - not a host-validated model; the host stores it verbatim, so these fields are a convention integrations follow, not a contract the host enforces.
+  - provider_id - the :Provider: identifier the contact came from (conventional)
+  - external_id - the record's id in the source :Provider: (conventional)
+  - full_name - human-readable display name (conventional)
+  - primary_email - canonical email address (conventional)
+  - job_title - free-form job title (conventional)
+  - company_name - free-form company name (conventional)
+  - custom_fields - free-form JSON object for fields that do not fit the shape above (conventional, defaults to empty object)
+
+- :Integration: is a runtime-discovered plug-in that pulls records out of a particular :Provider:.
+  - One :Integration: corresponds to one :Provider: identifier, which is recorded as the `source` of every :Record: it produces.
+  - The host logic that discovers integrations and invokes them in the ingest workflow is [ingest.py](../src/services/ingest.py) - imported from the host codebase; do not redefine or modify it.
+  - That module exports `discover_integrations()` and `run_integration_service(session, integration_name)` at the fully qualified import path `src.services.ingest` - conformance and unit tests that exercise host wiring must import from exactly that path, never a guessed shorter path like `src.ingest`.
+  - Integrations are discovered from the filesystem at runtime - the :Integration: named "foo" lives in `src/integrations/foo/` and may consist of multiple files inside that folder.
+  - An :Integration: may produce records of one or more data_types; the data_type travels with each record, so a single integration can emit several kinds.
+  - Plug-in contract - the integration package `src/integrations/{name}/__init__.py` must expose a top-level callable `fetch(get_stored)`.
+    - `get_stored` is a callback the host passes in; calling `get_stored(data_type)` returns every :Record: already stored for that data_type, regardless of source.
+    - `fetch(get_stored)` returns a list of records; each record is a dict with a `data_type` string and a `data` object.
+    - The host stores each returned record as a :Record: row under its own `data_type` and the integration's `source`, storing the `data` object verbatim.
+    - On each run the host upserts the integration's output; it never deletes previously-stored rows.
+      - Each returned record is matched to an existing row by its `source`, `data_type`, and `external_id`.
+      - A match is updated in place (only when its `data` actually changed); an unmatched record is inserted.
+      - Re-syncing is idempotent: an unchanged record produces no write, and nothing is ever removed.
+      - This lets an integration return only the records it wants to add or change, leaving the rest untouched.
+    - If the callable is missing or raises, the host treats the integration as failed for that ingest call - no partial writes are committed.
+
+***implementation reqs***
+
+- :Implementation: should be in Python 3.12.
+
+- :Implementation: should use pip + a `requirements.txt` for dependency management.
+  - The host's manifest is [requirements.txt](../requirements.txt) - the single source of truth for the packages already available; integrations must not re-pin anything listed there.
+
+- Every :Integration: must use only the packages already available in the host manifest.
+  - An :Integration: must NOT create a new `requirements.txt` file, and must NOT modify the host's `requirements.txt`.
+  - An :Integration: must NOT install, add, or pin any additional or provider-specific packages.
+  - Any capability an :Integration: needs must be built on the packages the host already provides.
+
+- :Implementation: should use FastAPI as the HTTP framework and Uvicorn as the ASGI server.
+  - The FastAPI application object is exposed at `src/main.py:app` so it can be run with `uvicorn src.main:app`.
+
+- :Implementation: should use SQLModel for ORM models and database session management against SQLite.
+  - The generic store is a single SQLModel `table=True` class for :Record:.
+  - SQLite is accessed through SQLModel's engine; SQLite foreign keys are enabled on every connection.
+  - Every column field on a SQLModel `table=True` class must carry an explicit Python type annotation alongside its `Field(...)` default - SQLModel on Pydantic v2 raises `PydanticUserError: Field '<name>' requires a type annotation` when a field has no annotation. Use forms like `id: int | None = Field(default=None, primary_key=True)`, `data_type: str = Field(index=True)`, `created_at: datetime = Field(default_factory=datetime.utcnow)`. Never write `id = Field(...)` without an annotation.
+  - The `data` JSON column on :Record: is declared with a typed Python container annotation and a `Field(sa_column=Column(JSON), default_factory=dict)` mapping; the model attribute is typed as `dict[str, Any]`.
+
+- :Implementation: should create the database schema on startup via SQLModel's metadata, before serving requests.
+  - No separate schema-migration tool is used; the single generic :Record: table is created directly.
+
+- :Implementation: should use Pydantic v2 models (separate from the SQLModel persistence models) for request and response schemas exposed by the HTTP API.
+  - Persistence models are not returned directly from the API; they are converted to response models first.
+
+- :Implementation: should use Python's standard `logging` module configured at startup with a JSON formatter and `INFO` as the default level.
+
+- :Implementation: source code is laid out under `src/` with one subpackage per layer.
+  - `src/main.py` - FastAPI application factory, startup hooks (logging config, schema creation, integration-discovery wiring), Uvicorn entry point.
+  - `src/api/` - FastAPI routers. One router file per resource (`records.py`, `ingest.py`, `health.py`). Routers are thin - they parse input, call a service or repository, format the response.
+  - `src/services/` - business logic. `ingest.py` orchestrates :Integration: discovery, invocation, and persistence of the returned :Record: rows.
+  - `src/repositories/` - SQLModel queries. `record_repo.py` reads and writes :Record: rows. Repositories return SQLModel instances; only services/routers convert to/from Pydantic schemas.
+  - `src/models/` - persistence and API models. `db.py` (the :Record: SQLModel class), `schemas.py` (Pydantic request/response schemas).
+  - `src/integrations/` - root for runtime-discovered :Integration: plug-ins. Each integration is a Python package at `src/integrations/<name>/`.
+  - `src/db.py` - the SQLModel engine + session factory.
+  - `src/config.py` - configuration loaded from environment variables (`CRM_DB_PATH`, `CRM_PORT`).
+  - The host backend is unauthenticated; the only credentials in play are the per-:Provider: ones each :Integration: reads from the environment when it runs.
+
+- The host stores whatever an :Integration: returns verbatim - there is no host-side validation, deduplication, or merging of records.
+  - Pulling records from a :Provider: either succeeds and returns a complete batch, or fails as a whole.
+  - Errors acquiring data (missing credentials, authentication failure, transport/HTTP errors) propagate to the caller; the host commits no partial writes when `fetch(get_stored)` raises.
+
+- Every :Integration:'s `fetch(get_stored)` applies a skip-and-log batch policy around its per-record mapping function.
+  - When the mapping function raises `ValueError` for a record, that record is skipped.
+  - A warning is logged naming the provider's record identifier and the reason for the skip.
+  - Processing continues with the remaining records; a skipped record never aborts the batch.
+  - A mapping function that never raises `ValueError` simply never triggers this policy.
+
+- Every :Integration: lives at `src/integrations/<id>/` with its :UnitTests: at `tests/integrations/<id>/`, keyed by its unique :Provider: identifier `<id>`.
+  - Each integration module defines exactly one :Provider: identifier; it is unique across all integrations.
+  - The only file contract is that `src/integrations/<id>/__init__.py` exports a top-level callable `fetch(get_stored)`.
+  - `fetch(get_stored)` returns a list of records, each a dict with a `data_type` string and a `data` object; the host stores the `data` verbatim as a :Record: row of that data_type.
+  - Any further internal organization of the package (helper modules, file names, how functions are split) is optional and left to each integration.
+
+- :UnitTests: of every :Integration: never make real network calls.
+  - All credential/token acquisition and all provider HTTP access go through single indirection seams so :UnitTests: can monkey-patch / inject fakes without touching the HTTP library or the network.
+  - The integration's mapping function must be tested with concrete sample provider payloads stored inline in the test files as Python dicts; no external fixtures.
+  - :UnitTests: must cover the `fetch(get_stored)` entry point: given a stubbed provider response and a `get_stored` callback, it returns the mapped records, each tagged with its `data_type` and carrying the mapped `data`.
+  - :UnitTests: must cover multi-page pagination: a first page carrying the provider's continuation marker followed by a final page without one, asserting records from both pages are returned.
+
+- :UnitTests: should be implemented using pytest.
+  - :UnitTests: source files live under `tests/` at the repository root, mirroring the `src/` layout - `tests/api/`, `tests/services/`, `tests/repositories/`, `tests/integrations/`.
+  - The `tests/integrations/{integration}/` folders host :UnitTests: for runtime-discovered :Integration: plug-ins.
+  - File naming follows pytest defaults: `test_*.py`, classes `Test*`, functions `test_*`.
+  - Every test directory (`tests/`, `tests/api/`, `tests/services/`, `tests/repositories/`, `tests/integrations/`) must contain an empty `__init__.py` file. Without these, two test files that share a basename (e.g. `tests/api/test_ingest.py` and `tests/services/test_ingest.py`) collide during pytest collection with `import file mismatch`. Equivalently, the project may set `pytest.ini`/`pyproject.toml` `[tool.pytest.ini_options]` with `importmode = "importlib"`, but the simpler and chosen approach is the per-directory `__init__.py` files.
+  - :UnitTests: must use an isolated in-memory SQLite engine per test (no shared state across tests, no reliance on `./crm.db`).
+  - :UnitTests: must exercise FastAPI routes through `fastapi.testclient.TestClient` rather than via raw network calls.
+  - The FastAPI app must expose its SQLModel session via a dependency (e.g. `get_session`) imported from `src/db.py`. :UnitTests: that hit endpoints must override that dependency through `app.dependency_overrides[get_session] = <fn returning the test session>` and must call `SQLModel.metadata.create_all(engine)` on the test engine **before** any request - otherwise the table-creation that happens on real startup is skipped and tests fail with "no such table". The dependency override and the test session must use the **same** in-memory engine for the duration of one test, so writes by the request handler are visible to the test's assertions.
+  - :UnitTests: that need a fake :Integration: must place the fake under a temporary directory pointed at by an env var override of `src/integrations/`; production discovery code must not be patched directly.
+
+- :UnitTests: are executed via the run script [test_scripts/run_unittests_python.sh](test_scripts/run_unittests_python.sh) - this is the exact contract the renderer's generated code must satisfy.
+  - The script stages the build into `.tmp/python_<arg>/`, creates a venv with Python 3.12, installs `requirements.txt` (and `pytest`), then runs `PYTHONPATH=<working folder> pytest -q --import-mode=importlib tests/`.
+  - The build folder must therefore ship a `requirements.txt` at its root, and importable `src` and `tests` packages so that `from src.<module> import ...` resolves under the staged working folder.

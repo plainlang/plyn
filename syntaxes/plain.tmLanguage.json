@@ -110,10 +110,6 @@
                     "match": "\"[^\"]*\""
                 },
                 {
-                    "name": "string.quoted.single.plain",
-                    "match": "'[^']*'"
-                },
-                {
                     "name": "string.quoted.other.backtick.plain",
                     "match": "`[^`]*`"
                 },

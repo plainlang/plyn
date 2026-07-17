@@ -5,11 +5,12 @@ import { BUILTIN_CONCEPTS, builtinCapitalizationMatch } from './builtins';
 // Diagnostics for .plain files: the strict ***definitions*** syntax rule plus
 // cross-file semantic diagnostics (unused / undefined / cyclic concepts).
 
-export const DIAGNOSTIC_SOURCE = 'plain';
+export const DIAGNOSTIC_SOURCE = '***plain';
 export const CODE_UNUSED = 'concept-unused';
 export const CODE_UNDEFINED = 'concept-undefined';
 export const CODE_CYCLIC = 'concept-cyclic';
 export const CODE_DID_YOU_MEAN = 'concept-did-you-mean';
+export const CODE_DUPLICATE = 'concept-duplicate-definition';
 export const CODE_UNKNOWN_SECTION = 'unknown-section';
 export const CODE_ACCEPTANCE_TESTS = 'acceptance-tests-placement';
 
@@ -256,9 +257,23 @@ export function computeSemanticDiagnostics(
     const diagnostics: vscode.Diagnostic[] = [];
     const cycles = detectCycles(agg.graph, agg.definedNames);
 
-    // unused & cyclic: anchored at declaration sites in this file.
+    // duplicate / unused / cyclic: anchored at declaration sites in this file.
     for (const site of service.definitionSitesInFile(filePath)) {
         const name = site.concept;
+
+        // A concept must be defined once. Flag every declaration when there is
+        // more than one anywhere in the workspace.
+        if (service.findConceptDefinition(name).length > 1) {
+            const diagnostic = new vscode.Diagnostic(
+                conceptTokenRange(site.line, site.character, name),
+                `Concept :${name}: is defined more than once.`,
+                vscode.DiagnosticSeverity.Error
+            );
+            diagnostic.source = DIAGNOSTIC_SOURCE;
+            diagnostic.code = CODE_DUPLICATE;
+            diagnostics.push(diagnostic);
+            continue;
+        }
 
         const cyclePath = cycles.get(name);
         if (cyclePath) {
@@ -289,11 +304,11 @@ export function computeSemanticDiagnostics(
 
         const isUsed = agg.usedNames.has(name) || agg.exportedNames.has(name);
         if (!isUsed) {
-            // Grey out the whole declaration line, like an unused statement.
-            const declLine = site.content ?? '';
-            const range = declLine
-                ? new vscode.Range(site.line, 0, site.line, declLine.length)
-                : conceptTokenRange(site.line, site.character, name);
+            // Grey out the whole definition — the declaration line plus any
+            // indented continuation lines beneath it.
+            const endLine = site.endLine ?? site.line;
+            const endCharacter = site.endCharacter ?? (site.content?.length ?? name.length + 2);
+            const range = new vscode.Range(site.line, 0, endLine, endCharacter);
             const diagnostic = new vscode.Diagnostic(
                 range,
                 `Concept :${name}: is defined but never used.`,
@@ -327,16 +342,22 @@ export function computeSemanticDiagnostics(
             continue;
         }
         const suggestion = knownByLower.get(name.toLowerCase());
-        const diagnostic = new vscode.Diagnostic(
-            conceptTokenRange(site.line, site.character, name),
-            suggestion
-                ? `Concept :${name}: is used but never defined. Did you mean :${suggestion}:?`
-                : `Concept :${name}: is used but never defined (missing concept definition).`,
-            vscode.DiagnosticSeverity.Error
-        );
-        diagnostic.source = DIAGNOSTIC_SOURCE;
-        diagnostic.code = CODE_UNDEFINED;
-        diagnostics.push(diagnostic);
+        const message = suggestion
+            ? `Concept :${name}: is used but never defined. Did you mean :${suggestion}:?`
+            : `Concept :${name}: is used but never defined (missing concept definition).`;
+        // Flag every occurrence within the statement, not just the first. The
+        // index keeps one entry per statement, but `occurrences` lists them all.
+        const occurrences = site.occurrences ?? [{ line: site.line, character: site.character }];
+        for (const occ of occurrences) {
+            const diagnostic = new vscode.Diagnostic(
+                conceptTokenRange(occ.line, occ.character, name),
+                message,
+                vscode.DiagnosticSeverity.Error
+            );
+            diagnostic.source = DIAGNOSTIC_SOURCE;
+            diagnostic.code = CODE_UNDEFINED;
+            diagnostics.push(diagnostic);
+        }
     }
 
     return diagnostics;

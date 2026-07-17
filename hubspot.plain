@@ -1,0 +1,44 @@
+---
+import:
+  - crm_common
+  - integration_testing
+description: "HubSpot Integration plug-in for the CRM backend. Adds src/integrations/hubspot/ so that GET /ingest/hubspot pulls Contact records from HubSpot via its REST API and stores them as contact records in the host's generic record store."
+---
+
+***section***
+
+- adsad
+
+- asdsadas
+
+- :adsadas:
+
+***definitions***
+
+- Wrong
+
+- :Test: is not used anywhere
+
+- :A: is a :B:
+
+- :B: is an :A:
+
+- :C: is a :C:
+
+- :D: is
+
+- :D: is
+
+- :F: is F
+    - :F: is an F
+
+- :HubSpotProvider: is the :Provider: identifier `hubspot` - the folder name `src/integrations/hubspot/`, the `source` recorded on every :Record: this integration produces, and the `provider_id` value the mapping stamps on each :Contact:. :MissingDef: is a missing definition.
+
+- :HubSpotIntegration: is the concrete :Integration: for :HubSpotProvider: that pulls HubSpot CRM `contact` records and produces :Contact: data dicts under the data_type `contact`.
+
+- :HubSpotCredentials: are the :IntegrationCredentials: for :HubSpotProvider:, used to authenticate against HubSpot with a static Private App access token sent as a bearer token, read from an environment variable.
+  - `HUBSPOT_ACCESS_TOKEN` - the HubSpot Private App access token, sent as `Authorization: Bearer <token>` on every request (required).
+  - There is no token endpoint and no refresh flow; the variable's value is used directly on every request.
+
+- :G: is :T:
+    - Use :T: to do something.

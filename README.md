@@ -12,7 +12,7 @@ The extension implements:
 - Rename concept support that lets you safely rename a concept across the workspace, keeping definitions and references in sync.
 - Go to definition and go to references so you can jump to where a concept is declared and see where it is used.
 - Hover that shows where a concept is defined and where it is used across the workspace.
-- Diagnostics for `***definitions***` syntax, unknown/misspelled section headers (with "did you mean" hints), and unused, undefined, and cyclic concepts.
+- Diagnostics for `***definitions***` syntax, unknown/misspelled section headers (with "did you mean" hints), and unused, undefined, cyclic, and duplicately-defined concepts.
 - Section folding to collapse a whole `***section***` (definitions, test reqs, functional specs, …) down to its header.
 - Plain file icon theme to make `.plain` files easy to spot in the explorer.
 
@@ -45,7 +45,7 @@ plyn is published to the [Open VSX Registry](https://open-vsx.org/extension/Code
 
 ### 0.0.2
 
-Adds diagnostics (definitions syntax; unused, undefined with "did you mean", and cyclic concepts; unknown/misspelled section headers; `***acceptance tests***` placement; built-in capitalization), built-in concepts (`:Implementation:`, `:ConformanceTests:`, `:AcceptanceTests:`, `:UnitTests:`) with hover descriptions, and section folding. Fixes indexing of concepts used only on indented lines, and stops a concept's own declaration from being listed as one of its usages.
+Adds diagnostics (definitions syntax; unused, undefined with "did you mean", cyclic, and duplicate concepts; unknown/misspelled section headers; `***acceptance tests***` placement; built-in capitalization), built-in concepts (`:Implementation:`, `:ConformanceTests:`, `:AcceptanceTests:`, `:UnitTests:`) with hover descriptions, and section folding. Fixes indexing of concepts used only on indented lines, and stops a concept's own declaration from being listed as one of its usages.
 
 ### 0.0.1
 

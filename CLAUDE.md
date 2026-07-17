@@ -95,6 +95,7 @@ Published via a `DiagnosticCollection`. The syntax rule is per-buffer; the rest 
 - **Unused concept** (Hint + `Unnecessary`; greys the whole declaration line) — defined but never referenced. `exported_concepts:` are exempt.
 - **Undefined concept** (error) — a used concept that is not *known*. A concept is known if declared anywhere in the workspace, listed in `required_concepts:`, provided by a resolvable `import:` (`<name>.plain` in the file's dir or a `template`/`templates`/`imports` subfolder), or a built-in. When an unknown name differs only in capitalization from a known one, the message appends "Did you mean :X:?".
 - **Cyclic concepts** (error) — a definition-reference cycle (`:A:` → `:B:` → `:A:`), flagged on each concept in the cycle.
+- **Duplicate definition** (error) — a concept declared more than once (workspace-wide, via `definedConceptIndex`) is flagged on each declaration.
 - **Wrong capitalization of a built-in** (warning) — declaring a concept that differs only in case from a built-in (e.g. `:implementation:`) suggests the built-in.
 
 Note: usages are folded per **logical statement** (a non-indented line plus its indented children), so a concept used only on an indented sub-line is still indexed — the whole statement counts as one usage, attributed to the concept's first occurrence.
