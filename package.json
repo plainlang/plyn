@@ -2,7 +2,7 @@
   "name": "plyn",
   "displayName": "plyn",
   "description": "IDE extension providing language support for ***plain.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "Codeplain",
   "engines": {
     "vscode": "^1.99.3"

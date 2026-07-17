@@ -4,6 +4,18 @@ All notable changes to the **plyn** extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [0.0.3]
+
+### Changed
+
+- **Diagnostic source** renamed from `plain` to `***plain` — errors and warnings now read e.g. `***plain concept-undefined`.
+- **Single-quote strings** (`'text'`) are no longer highlighted as strings, in both the VS Code / Cursor grammar and the Zed grammar.
+
+### Fixed
+
+- **Duplicate definition** no longer flags an indented bullet beneath a definition. An indented list item is treated as further clarification of the concept above it, not a second declaration.
+- **Undefined concept** is now flagged at every occurrence within a logical statement, not just the first — repeated uses of an undefined concept (including on indented continuation lines) each get an error.
+
 ## [0.0.2]
 
 ### Added
